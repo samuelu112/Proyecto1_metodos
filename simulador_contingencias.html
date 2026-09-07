@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de contingencias · Microrred de 4 barras</title>
+<style>
+  :root{
+    --fondo:#E9EDEF;
+    --panel:#FBFCFC;
+    --tinta:#16242E;
+    --tinta-suave:#5A6B75;
+    --regla:#B6C2C8;
+    --ok:#0C7A54;
+    --aviso:#9A6B08;
+    --falla:#A82D24;
+    --esquema:#16506E;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--fondo);
+    color:var(--tinta);
+    font-family:"Segoe UI",Candara,Optima,system-ui,-apple-system,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    padding:28px 20px 56px;
+  }
+  .envoltura{max-width:1120px;margin:0 auto}
+  h1{
+    font-family:Georgia,"Times New Roman",serif;
+    font-weight:400;
+    font-size:27px;
+    line-height:1.25;
+    margin:0 0 4px;
+  }
+  .entradilla{color:var(--tinta-suave);margin:0 0 24px;max-width:62ch}
+  h2{
+    font-family:Georgia,serif;
+    font-weight:400;
+    font-size:17px;
+    margin:0 0 12px;
+    padding-bottom:7px;
+    border-bottom:1px solid var(--regla);
+  }
+  .rejilla{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,1fr);gap:20px;align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--regla);padding:18px 20px 20px}
+  svg{display:block;width:100%;height:auto}
+
+  /* --- diagrama --- */
+  .linea-clic{stroke:transparent;stroke-width:20;fill:none;cursor:pointer}
+  .linea-clic:focus-visible{outline:2px solid var(--esquema);outline-offset:2px}
+  .linea{stroke:var(--tinta);stroke-width:2;fill:none;transition:stroke .18s,stroke-width .18s}
+  .linea.fuera{stroke:var(--falla);stroke-width:1.5;stroke-dasharray:5 5;opacity:.55}
+  .caja{fill:var(--panel);stroke:var(--tinta);stroke-width:1.5}
+  .caja.aislada{stroke:var(--falla);stroke-dasharray:4 3}
+  .rotulo{font-size:12.5px;fill:var(--tinta);font-family:inherit}
+  .rotulo-tenue{font-size:11.5px;fill:var(--tinta-suave);font-family:inherit}
+  .lectura{font-size:15px;font-family:inherit;font-variant-numeric:tabular-nums;font-weight:600}
+  .marca-linea{font-size:11.5px;fill:var(--tinta-suave);font-family:inherit;pointer-events:none}
+  .marca-linea.fuera{fill:var(--falla)}
+
+  /* --- indicadores --- */
+  .medidas{list-style:none;margin:0;padding:0}
+  .medidas li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px dotted var(--regla)}
+  .medidas li:last-child{border-bottom:0}
+  .medidas .etq{color:var(--tinta-suave);font-size:13.5px}
+  .medidas .val{font-variant-numeric:tabular-nums;font-weight:600;font-size:15.5px}
+  .ok{color:var(--ok)} .aviso{color:var(--aviso)} .falla{color:var(--falla)}
+
+  /* --- tablas --- */
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13.5px}
+  caption{text-align:left;color:var(--tinta-suave);font-size:13px;padding-bottom:8px}
+  th{text-align:right;font-weight:600;color:var(--tinta-suave);font-size:12.5px;padding:5px 8px;border-bottom:1px solid var(--regla)}
+  th:first-child,td:first-child{text-align:left}
+  td{text-align:right;padding:5px 8px;border-bottom:1px solid #E4E9EB}
+  tbody tr:last-child td{border-bottom:0}
+  tr.inactiva td{color:var(--tinta-suave);text-decoration:line-through;text-decoration-color:var(--regla)}
+
+  /* --- mensajes --- */
+  .avisos{margin:20px 0 0;display:grid;gap:8px}
+  .nota{border-left:3px solid;padding:9px 14px;background:var(--panel);font-size:14px}
+  .nota.falla{border-color:var(--falla)}
+  .nota.aviso{border-color:var(--aviso)}
+  .nota.ok{border-color:var(--ok)}
+  .nota strong{font-weight:600}
+
+  /* --- controles --- */
+  .barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0 0}
+  button{
+    font:inherit;font-size:13.5px;padding:6px 13px;
+    background:var(--panel);color:var(--tinta);
+    border:1px solid var(--regla);cursor:pointer;
+  }
+  button:hover{border-color:var(--esquema);color:var(--esquema)}
+  button:focus-visible{outline:2px solid var(--esquema);outline-offset:2px}
+  button[aria-pressed="true"]{background:var(--tinta);color:var(--panel);border-color:var(--tinta)}
+  .barra .pista{color:var(--tinta-suave);font-size:13px;margin-left:auto}
+  /* --- grafica --- */
+  .leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px}
+  .leyenda button{
+    display:inline-flex;align-items:center;gap:7px;
+    border:0;background:none;padding:3px 2px;font-size:13px;color:var(--tinta);cursor:pointer;
+  }
+  .leyenda button[aria-pressed="false"]{color:var(--tinta-suave);opacity:.5}
+  .leyenda .muestra{width:22px;height:0;border-top-width:2.5px;border-top-style:solid;flex:none}
+  .leyenda button[aria-pressed="false"] .muestra{border-top-style:dotted}
+  .eje{stroke:var(--regla);stroke-width:1;fill:none}
+  .malla{stroke:#DDE4E7;stroke-width:1;fill:none}
+  .limite{stroke:var(--falla);stroke-width:1.2;stroke-dasharray:3 3;fill:none}
+  .marcaeje{font-size:11.5px;fill:var(--tinta-suave);font-family:inherit}
+  .tituloeje{font-size:12.5px;fill:var(--tinta-suave);font-family:inherit}
+  .serie{fill:none;stroke-linejoin:round;stroke-linecap:round}
+  .abajo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:20px;margin-top:20px}
+  @media (max-width:860px){
+    .rejilla,.abajo{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+  <h1>Contingencias N-1 en una microrred de cuatro barras</h1>
+  <p class="entradilla">Haz clic sobre cualquier línea del diagrama para sacarla de servicio. El flujo de
+  potencia se resuelve otra vez con Newton–Raphson y todos los valores se actualizan.</p>
+
+  <div class="rejilla">
+    <div class="panel">
+      <h2>Diagrama unifilar</h2>
+      <svg id="diagrama" viewBox="0 0 560 396" role="img" aria-label="Diagrama unifilar interactivo de la microrred">
+        <g id="lineas"></g>
+        <g id="barras"></g>
+      </svg>
+      <div class="barra" id="botones"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Estado del sistema</h2>
+      <ul class="medidas" id="medidas"></ul>
+    </div>
+  </div>
+
+  <div class="avisos" id="avisos"></div>
+
+  <div class="panel" style="margin-top:20px">
+    <h2>Perfil de voltaje</h2>
+    <svg id="grafica" viewBox="0 0 720 330" role="img"
+         aria-label="Perfil de magnitud de voltaje por barra para el caso base, las cinco contingencias y la configuración actual"></svg>
+    <div class="leyenda" id="leyenda"></div>
+  </div>
+
+  <div class="abajo">
+    <div class="panel">
+      <h2>Barras</h2>
+      <table id="tablaBarras">
+        <caption>Δ es el cambio respecto al caso base con todas las líneas en servicio.</caption>
+        <thead><tr><th>Barra</th><th>|V| p.u.</th><th>Δ|V|</th><th>δ °</th><th>P p.u.</th><th>Q p.u.</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Flujos por línea</h2>
+      <table id="tablaLineas">
+        <caption>Potencia que sale de la primera barra hacia la segunda. La corriente se compara contra 340 A de ampacidad.</caption>
+        <thead><tr><th>Línea</th><th>P</th><th>Q</th><th>Pérdidas</th><th>I (A)</th><th>% amp.</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Flujo de potencia — mismo algoritmo que el notebook de Python.
+   Ybus -> inyecciones -> Jacobiana analítica -> Gauss con pivoteo
+   parcial -> Newton-Raphson.
+   ============================================================ */
+const SLACK = 0, PV = 1, PQ = 2;
+const N = 4;
+const TIPOS  = [SLACK, PV, PQ, PQ];
+const V_ESP  = [1.00, 1.00, 1.00, 1.00];
+const P_PROG = [0.00, 0.40, -0.50, -0.35];
+const Q_PROG = [0.00, 0.00, -0.30, -0.20];
+const Q_MAX_2 = 0.60;            // reactivo nominal del generador de 1 MVA a fp 0.8
+const I_BASE  = 138.79;          // A, para base 1 MVA y 4.16 kV
+const AMPACIDAD = 340;           // A, ACSR 4/0
+const V_MIN = 0.95, V_MAX = 1.05;
+
+const LINEAS = [
+  {i:0,j:1,R:0.04,X:0.06,nom:"1-2"},
+  {i:0,j:2,R:0.05,X:0.07,nom:"1-3"},
+  {i:1,j:2,R:0.03,X:0.05,nom:"2-3"},
+  {i:1,j:3,R:0.06,X:0.08,nom:"2-4"},
+  {i:2,j:3,R:0.05,X:0.06,nom:"3-4"},
+];
+
+const ceros = (n,m) => Array.from({length:n}, () => new Array(m).fill(0));
+
+function construirYbus(activas){
+  const G = ceros(N,N), B = ceros(N,N);
+  for (const L of activas){
+    const den = L.R*L.R + L.X*L.X;
+    const gr = L.R/den, bi = -L.X/den;        // y = (R - jX)/(R^2 + X^2)
+    G[L.i][L.i] += gr; B[L.i][L.i] += bi;
+    G[L.j][L.j] += gr; B[L.j][L.j] += bi;
+    G[L.i][L.j] -= gr; B[L.i][L.j] -= bi;
+    G[L.j][L.i] -= gr; B[L.j][L.i] -= bi;
+  }
+  return {G,B};
+}
+
+// Recorrido en anchura desde la slack: detecta barras que quedaron sin camino
+function conectadas(activas){
+  const ady = Array.from({length:N}, () => []);
+  for (const L of activas){ ady[L.i].push(L.j); ady[L.j].push(L.i); }
+  const vis = new Array(N).fill(false); const cola=[0]; vis[0]=true;
+  while(cola.length){
+    const u = cola.shift();
+    for (const v of ady[u]) if(!vis[v]){ vis[v]=true; cola.push(v); }
+  }
+  return vis;
+}
+
+function inyecciones(V,d,G,B){
+  const P = new Array(N).fill(0), Q = new Array(N).fill(0);
+  for(let i=0;i<N;i++) for(let k=0;k<N;k++){
+    const dik = d[i]-d[k];
+    P[i] += V[i]*V[k]*(G[i][k]*Math.cos(dik) + B[i][k]*Math.sin(dik));
+    Q[i] += V[i]*V[k]*(G[i][k]*Math.sin(dik) - B[i][k]*Math.cos(dik));
+  }
+  return {P,Q};
+}
+
+function indices(){
+  const ang=[], mag=[];
+  for(let i=0;i<N;i++){
+    if(TIPOS[i]!==SLACK) ang.push(i);
+    if(TIPOS[i]===PQ)    mag.push(i);
+  }
+  return {ang,mag};
+}
+
+function jacobiana(V,d,G,B,ang,mag){
+  const {P,Q} = inyecciones(V,d,G,B);
+  const na=ang.length, nm=mag.length;
+  const J = ceros(na+nm, na+nm);
+  for(let a=0;a<na;a++){
+    const i=ang[a];
+    for(let b=0;b<na;b++){
+      const k=ang[b], dik=d[i]-d[k];
+      J[a][b] = (i===k) ? -Q[i] - B[i][i]*V[i]*V[i]
+                        : V[i]*V[k]*(G[i][k]*Math.sin(dik) - B[i][k]*Math.cos(dik));
+    }
+    for(let b=0;b<nm;b++){
+      const k=mag[b], dik=d[i]-d[k];
+      J[a][na+b] = (i===k) ? P[i]/V[i] + G[i][i]*V[i]
+                           : V[i]*(G[i][k]*Math.cos(dik) + B[i][k]*Math.sin(dik));
+    }
+  }
+  for(let a=0;a<nm;a++){
+    const i=mag[a];
+    for(let b=0;b<na;b++){
+      const k=ang[b], dik=d[i]-d[k];
+      J[na+a][b] = (i===k) ? P[i] - G[i][i]*V[i]*V[i]
+                           : -V[i]*V[k]*(G[i][k]*Math.cos(dik) + B[i][k]*Math.sin(dik));
+    }
+    for(let b=0;b<nm;b++){
+      const k=mag[b], dik=d[i]-d[k];
+      J[na+a][na+b] = (i===k) ? Q[i]/V[i] - B[i][i]*V[i]
+                              : V[i]*(G[i][k]*Math.sin(dik) - B[i][k]*Math.cos(dik));
+    }
+  }
+  return J;
+}
+
+function gaussPivoteo(A,b){
+  const n=b.length;
+  const M = A.map((f,r)=>[...f, b[r]]);
+  for(let c=0;c<n;c++){
+    let p=c;
+    for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[p][c])) p=r;
+    if(Math.abs(M[p][c])<1e-14) return null;         // pivote nulo: matriz singular
+    if(p!==c){ const t=M[c]; M[c]=M[p]; M[p]=t; }
+    for(let r=c+1;r<n;r++){
+      const m = M[r][c]/M[c][c];
+      for(let q=c;q<=n;q++) M[r][q] -= m*M[c][q];
+    }
+  }
+  const x=new Array(n).fill(0);
+  for(let r=n-1;r>=0;r--){
+    let s=M[r][n];
+    for(let q=r+1;q<n;q++) s -= M[r][q]*x[q];
+    x[r]=s/M[r][r];
+  }
+  return x;
+}
+
+function newton(G,B,tol=1e-10,maxIter=40){
+  const {ang,mag}=indices(); const na=ang.length;
+  const V=[...V_ESP], d=new Array(N).fill(0);
+  let err=Infinity, it=0;
+  for(it=0; it<=maxIter; it++){
+    const {P,Q}=inyecciones(V,d,G,B);
+    const F=[];
+    for(const i of ang) F.push(P_PROG[i]-P[i]);
+    for(const i of mag) F.push(Q_PROG[i]-Q[i]);
+    err = Math.max(...F.map(Math.abs));
+    if(err<tol){ return {V,d,it,err,ok:true,P,Q}; }
+    if(it===maxIter) break;
+    const dx = gaussPivoteo(jacobiana(V,d,G,B,ang,mag), F);
+    if(!dx) break;
+    ang.forEach((i,a)=> d[i]+=dx[a]);
+    mag.forEach((i,a)=> V[i]+=dx[na+a]);
+    if(!V.every(Number.isFinite)||!d.every(Number.isFinite)) break;
+  }
+  const {P,Q}=inyecciones(V,d,G,B);
+  return {V,d,it,err,ok:false,P,Q};
+}
+
+function flujos(activas,V,d){
+  return activas.map(L=>{
+    const den=L.R*L.R+L.X*L.X, gr=L.R/den, bi=-L.X/den;
+    const vir=V[L.i]*Math.cos(d[L.i]), vii=V[L.i]*Math.sin(d[L.i]);
+    const vjr=V[L.j]*Math.cos(d[L.j]), vji=V[L.j]*Math.sin(d[L.j]);
+    const dr=vir-vjr, di=vii-vji;
+    const ir=dr*gr-di*bi, ii=dr*bi+di*gr;         // I = (Vi - Vj) y
+    const Pij= vir*ir+vii*ii, Qij= vii*ir-vir*ii; // S = V conj(I)
+    const Pji=-(vjr*ir+vji*ii), Qji=-(vji*ir-vjr*ii);
+    return {nom:L.nom,Pij,Qij,perd:Pij+Pji,I:Math.hypot(ir,ii)};
+  });
+}
+
+function resolver(fuera){
+  const activas = LINEAS.filter((_,k)=>!fuera.includes(k));
+  const vis = conectadas(activas);
+  if(!vis.every(Boolean))
+    return {estado:"aislada", aisladas: vis.map((v,i)=>v?null:i+1).filter(Boolean)};
+  const {G,B} = construirYbus(activas);
+  const r = newton(G,B);
+  if(!r.ok) return {estado:"sinSolucion", err:r.err, it:r.it};
+  return {estado:"ok", ...r, lineas: flujos(activas,r.V,r.d)};
+}
+
+/* ============================================================
+   Interfaz
+   ============================================================ */
+const BARRAS = [
+  {n:"Barra 1", tipo:"Slack",  desc:"Red principal", x:50,  y:58},
+  {n:"Barra 2", tipo:"PV",     desc:"Generador",     x:390, y:58},
+  {n:"Barra 3", tipo:"PQ",     desc:"Carga",         x:50,  y:264},
+  {n:"Barra 4", tipo:"PQ",     desc:"Carga",         x:390, y:264},
+];
+const CAJA_W = 120, CAJA_H = 72;
+const TRAZOS = [
+  {d:"M170 94 L390 94",   tx:280, ty:82,  anc:"middle"},
+  {d:"M110 130 L110 264", tx:100, ty:197, anc:"end"},
+  {d:"M392 130 L172 262", tx:296, ty:176, anc:"end"},
+  {d:"M450 130 L450 264", tx:460, ty:197, anc:"start"},
+  {d:"M170 300 L390 300", tx:280, ty:288, anc:"middle"},
+];
+const NS = "http://www.w3.org/2000/svg";
+const el = (t,a={})=>{ const e=document.createElementNS(NS,t); for(const k in a) e.setAttribute(k,a[k]); return e; };
+const num = (v,n=5)=> v.toFixed(n);
+
+let fuera = [];
+let base = null;
+
+function dibujarDiagrama(){
+  const gL = document.getElementById("lineas");
+  const gB = document.getElementById("barras");
+  gL.textContent = ""; gB.textContent = "";
+
+  TRAZOS.forEach((T,k)=>{
+    const off = fuera.includes(k);
+    gL.appendChild(el("path",{d:T.d, class:"linea"+(off?" fuera":""), id:"ln"+k}));
+    const t = el("text",{x:T.tx, y:T.ty, "text-anchor":T.anc, class:"marca-linea"+(off?" fuera":"")});
+    t.textContent = LINEAS[k].nom + (off ? " · fuera" : "");
+    gL.appendChild(t);
+    const hit = el("path",{d:T.d, class:"linea-clic", tabindex:"0", role:"button",
+      "aria-pressed": off ? "true":"false",
+      "aria-label":"Línea "+LINEAS[k].nom+(off?", fuera de servicio":", en servicio")});
+    hit.addEventListener("click", ()=>alternar(k));
+    hit.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); alternar(k); }});
+    gL.appendChild(hit);
+  });
+
+  const r = resolver(fuera);
+  const vis = r.estado==="aislada"
+      ? conectadas(LINEAS.filter((_,k)=>!fuera.includes(k)))
+      : [true,true,true,true];
+
+  BARRAS.forEach((b,i)=>{
+    const aislada = !vis[i];
+    gB.appendChild(el("rect",{x:b.x, y:b.y, width:CAJA_W, height:CAJA_H, rx:3,
+                              class:"caja"+(aislada?" aislada":"")}));
+    const cx = b.x + CAJA_W/2;
+    const t1 = el("text",{x:cx, y:b.y+19, "text-anchor":"middle", class:"rotulo"});
+    t1.textContent = b.n + " · " + b.tipo;
+    const t2 = el("text",{x:cx, y:b.y+35, "text-anchor":"middle", class:"rotulo-tenue"});
+    t2.textContent = b.desc;
+    gB.append(t1,t2);
+
+    const t3 = el("text",{x:cx, y:b.y+57, "text-anchor":"middle", class:"lectura"});
+    if(r.estado==="ok"){
+      t3.textContent = num(r.V[i],4)+" p.u.";
+      t3.setAttribute("fill", r.V[i] < V_MIN || r.V[i] > V_MAX
+        ? "var(--falla)" : (r.V[i] < 0.96 ? "var(--aviso)" : "var(--ok)"));
+    }else{
+      t3.textContent = aislada ? "aislada" : "—";
+      t3.setAttribute("fill", aislada ? "var(--falla)" : "var(--tinta-suave)");
+    }
+    gB.appendChild(t3);
+  });
+}
+
+function dibujarBotones(){
+  const cont = document.getElementById("botones");
+  cont.textContent = "";
+  LINEAS.forEach((L,k)=>{
+    const b = document.createElement("button");
+    b.type="button";
+    b.textContent = L.nom;
+    b.setAttribute("aria-pressed", fuera.includes(k) ? "true":"false");
+    b.title = fuera.includes(k) ? "Volver a poner en servicio" : "Sacar de servicio";
+    b.addEventListener("click", ()=>alternar(k));
+    cont.appendChild(b);
+  });
+  const rst = document.createElement("button");
+  rst.type="button"; rst.textContent="Restablecer";
+  rst.addEventListener("click", ()=>{ fuera=[]; pintar(); });
+  cont.appendChild(rst);
+  const pista = document.createElement("span");
+  pista.className="pista";
+  pista.textContent = fuera.length===0 ? "Todas en servicio"
+    : fuera.length+" línea"+(fuera.length>1?"s":"")+" fuera";
+  cont.appendChild(pista);
+}
+
+function fila(etq, valor, clase){
+  const li=document.createElement("li");
+  const a=document.createElement("span"); a.className="etq"; a.textContent=etq;
+  const b=document.createElement("span"); b.className="val"+(clase?" "+clase:""); b.textContent=valor;
+  li.append(a,b); return li;
+}
+
+function pintar(){
+  dibujarDiagrama();
+  dibujarBotones();
+  const r = resolver(fuera);
+  const med = document.getElementById("medidas");
+  const avisos = document.getElementById("avisos");
+  const tb = document.querySelector("#tablaBarras tbody");
+  const tl = document.querySelector("#tablaLineas tbody");
+  med.textContent=""; avisos.textContent=""; tb.textContent=""; tl.textContent="";
+
+  const nota = (clase, html)=>{
+    const d=document.createElement("div"); d.className="nota "+clase; d.innerHTML=html;
+    avisos.appendChild(d);
+  };
+
+  if(r.estado==="aislada"){
+    med.appendChild(fila("Estado","Red desconectada","falla"));
+    med.appendChild(fila("Barras sin camino", r.aisladas.join(", "),"falla"));
+    nota("falla","<strong>La red quedó partida.</strong> Las barras "+r.aisladas.join(", ")+
+      " no tienen ningún camino hacia la barra slack, así que el flujo de potencia no tiene solución. "+
+      "Ese es el motivo de que la topología del proyecto sea mallada: con las cinco líneas, ninguna salida individual aísla una barra.");
+    return;
+  }
+  if(r.estado==="sinSolucion"){
+    med.appendChild(fila("Estado","Newton no converge","falla"));
+    med.appendChild(fila("Último desajuste", r.err.toExponential(2),"falla"));
+    nota("falla","<strong>No se encontró solución.</strong> Newton no convergió en 40 iteraciones. "+
+      "Con esta topología la red no puede transportar la potencia programada: no es una falla del algoritmo sino la inexistencia física de un punto de operación.");
+    return;
+  }
+
+  const perd = r.P.reduce((a,b)=>a+b,0);
+  const vmin = Math.min(...r.V);
+  const iBarra = r.V.indexOf(vmin);
+  const imax = Math.max(...r.lineas.map(L=>L.I))*I_BASE;
+
+  med.appendChild(fila("Iteraciones de Newton", String(r.it)));
+  med.appendChild(fila("Desajuste final", r.err.toExponential(2)));
+  med.appendChild(fila("Voltaje mínimo", num(vmin,5)+" (barra "+(iBarra+1)+")",
+      vmin<V_MIN ? "falla" : (vmin<0.96?"aviso":"ok")));
+  med.appendChild(fila("Pérdidas activas", num(perd,5)+" p.u.  ("+(perd*1000).toFixed(1)+" kW)"));
+  med.appendChild(fila("Aporte de la red (P₁)", num(r.P[0],5)+" p.u."));
+  med.appendChild(fila("Reactivo del generador", num(r.Q[1],4)+" / "+Q_MAX_2.toFixed(2)+" p.u.",
+      r.Q[1]>Q_MAX_2 ? "falla" : (r.Q[1]>0.9*Q_MAX_2?"aviso":"ok")));
+  med.appendChild(fila("Corriente máxima", imax.toFixed(1)+" A  ("+(100*imax/AMPACIDAD).toFixed(1)+" %)",
+      imax>AMPACIDAD ? "falla" : (imax>0.8*AMPACIDAD?"aviso":"ok")));
+
+  if(fuera.length===0) base = r.V.slice();
+
+  // --- avisos ---
+  if(vmin < V_MIN)
+    nota("falla","<strong>Voltaje fuera de límite.</strong> La barra "+(iBarra+1)+" cae a "+num(vmin,4)+
+      " p.u., por debajo del mínimo operativo de 0,95. Es una violación del criterio de seguridad N-1.");
+  if(r.Q[1] > Q_MAX_2)
+    nota("falla","<strong>Generador saturado.</strong> Sostener 1,00 p.u. en la barra 2 exigiría "+
+      num(r.Q[1],3)+" p.u. de reactivo, más de los "+Q_MAX_2.toFixed(2)+" p.u. que puede entregar. "+
+      "El modelo de barra PV deja de representar al equipo real: haría falta reclasificarla a PQ.");
+  else if(r.Q[1] > 0.9*Q_MAX_2)
+    nota("aviso","<strong>Poco margen reactivo.</strong> El generador usa "+
+      (100*r.Q[1]/Q_MAX_2).toFixed(0)+" % de su capacidad reactiva.");
+  if(imax > AMPACIDAD)
+    nota("falla","<strong>Conductor sobrecargado.</strong> La corriente máxima llega a "+imax.toFixed(0)+
+      " A sobre una ampacidad de "+AMPACIDAD+" A.");
+  if(avisos.childElementCount===0)
+    nota("ok", fuera.length===0
+      ? "<strong>Caso base.</strong> Todas las líneas en servicio y todos los límites respetados."
+      : "<strong>Contingencia soportada.</strong> La red opera dentro de límites sin esa línea.");
+
+  // --- tabla de barras ---
+  const NOMB=["Slack","PV","PQ","PQ"];
+  for(let i=0;i<N;i++){
+    const tr=document.createElement("tr");
+    const dv = base ? r.V[i]-base[i] : 0;
+    const celdas=[ (i+1)+" · "+NOMB[i], num(r.V[i],5),
+                   (base && fuera.length? (dv>=0?"+":"")+num(dv,5) : "—"),
+                   (r.d[i]*180/Math.PI).toFixed(4), num(r.P[i],5), num(r.Q[i],5) ];
+    celdas.forEach((c,ci)=>{ const td=document.createElement("td"); td.textContent=c;
+      if(ci===1 && (r.V[i]<V_MIN||r.V[i]>V_MAX)) td.className="falla";
+      tr.appendChild(td); });
+    tb.appendChild(tr);
+  }
+
+  dibujarGrafica();
+
+  // --- tabla de líneas ---
+  LINEAS.forEach((L,k)=>{
+    const tr=document.createElement("tr");
+    const off = fuera.includes(k);
+    const f = off ? null : r.lineas.find(x=>x.nom===L.nom);
+    const amp = f ? 100*f.I*I_BASE/AMPACIDAD : 0;
+    const celdas = off ? [L.nom,"fuera","—","—","—","—"]
+      : [L.nom, num(f.Pij,5), num(f.Qij,5), num(f.perd,5),
+         (f.I*I_BASE).toFixed(1), amp.toFixed(1)+"%"];
+    if(off) tr.className="inactiva";
+    celdas.forEach((c,ci)=>{ const td=document.createElement("td"); td.textContent=c;
+      if(!off && ci===5 && amp>100) td.className="falla";
+      tr.appendChild(td); });
+    tl.appendChild(tr);
+  });
+}
+
+/* ============================================================
+   Gráfica del perfil de voltaje
+   ============================================================ */
+const COLORES = ["#2E6E8E","#0C7A54","#6A5AA8","#9A6B08","#B0517A"];
+// Las cinco contingencias simples no cambian: se resuelven una sola vez
+const CONTING = LINEAS.map((L,k)=>({nom:L.nom, col:COLORES[k], r:resolver([k])}));
+const visibles = new Set(["base","actual", ...LINEAS.map((_,k)=>"c"+k)]);
+
+const GX0=68, GX1=706, GY0=18, GY1=270;   // área de trazado
+
+function xBarra(i){ const pad=56; return GX0+pad + i*((GX1-GX0)-2*pad)/3; }
+
+function dibujarGrafica(){
+  const svg = document.getElementById("grafica");
+  svg.textContent = "";
+  const actual = fuera.length ? resolver(fuera) : null;
+
+  // --- series a trazar ---
+  const series = [];
+  series.push({id:"base", nom:"Caso base", col:"var(--tinta)", V:base, ancho:2.8, guion:null});
+  CONTING.forEach((c,k)=>{
+    if(c.r.estado==="ok")
+      series.push({id:"c"+k, nom:"Sin línea "+c.nom, col:c.col, V:c.r.V, ancho:1.4, guion:"5 4"});
+  });
+  if(actual && actual.estado==="ok" && fuera.length>0){
+    const viola = Math.min(...actual.V) < V_MIN;
+    series.push({id:"actual", nom:"Selección actual", V:actual.V,
+                 col: viola ? "var(--falla)" : "var(--esquema)", ancho:3.4, guion:null});
+  }
+
+  // --- escala vertical, solo con lo visible ---
+  const datos=[0.95, 1.0];
+  series.forEach(s=>{ if(visibles.has(s.id)) s.V.forEach(v=>datos.push(v)); });
+  let lo=Math.min(...datos), hi=Math.max(...datos);
+  const margen=(hi-lo)*0.12 || 0.01;
+  lo-=margen; hi+=margen;
+  const yV = v => GY1 - (v-lo)/(hi-lo)*(GY1-GY0);
+
+  const add=(t,a,txt)=>{ const e=el(t,a); if(txt!==undefined) e.textContent=txt; svg.appendChild(e); return e; };
+
+  // --- malla y eje vertical ---
+  const nTicks=5;
+  for(let t=0;t<=nTicks;t++){
+    const v = lo + (hi-lo)*t/nTicks, y = yV(v);
+    add("path",{d:`M${GX0} ${y} L${GX1} ${y}`, class:"malla"});
+    add("text",{x:GX0-9, y:y+4, "text-anchor":"end", class:"marcaeje"}, v.toFixed(3));
+  }
+  add("path",{d:`M${GX0} ${GY0} L${GX0} ${GY1} L${GX1} ${GY1}`, class:"eje"});
+
+  // --- límite operativo ---
+  add("path",{d:`M${GX0} ${yV(0.95)} L${GX1} ${yV(0.95)}`, class:"limite"});
+  add("text",{x:GX0+7, y:yV(0.95)-6, "text-anchor":"start", class:"marcaeje",
+              fill:"var(--falla)"}, "límite operativo 0,95 p.u.");
+
+  // --- eje horizontal ---
+  for(let i=0;i<N;i++)
+    add("text",{x:xBarra(i), y:GY1+20, "text-anchor":"middle", class:"marcaeje"}, "Barra "+(i+1));
+  add("text",{x:(GX0+GX1)/2, y:GY1+42, "text-anchor":"middle", class:"tituloeje"}, "Barra");
+  add("text",{x:18, y:(GY0+GY1)/2, "text-anchor":"middle", class:"tituloeje",
+              transform:`rotate(-90 18 ${(GY0+GY1)/2})`}, "Magnitud de voltaje [p.u.]");
+
+  // --- series: primero las contingencias, luego base, al final la actual ---
+  const orden = [...series].sort((a,b)=>a.ancho-b.ancho);
+  orden.forEach(s=>{
+    if(!visibles.has(s.id)) return;
+    const pts = s.V.map((v,i)=>`${xBarra(i)},${yV(v)}`).join(" ");
+    const at = {points:pts, class:"serie", stroke:s.col, "stroke-width":s.ancho};
+    if(s.guion) at["stroke-dasharray"]=s.guion;
+    svg.appendChild(el("polyline",at));
+    s.V.forEach((v,i)=>{
+      const c = el("circle",{cx:xBarra(i), cy:yV(v), r:s.ancho>2.5?4.5:3, fill:s.col});
+      const t = el("title"); t.textContent = `${s.nom} · barra ${i+1}: ${v.toFixed(5)} p.u.`;
+      c.appendChild(t); svg.appendChild(c);
+    });
+  });
+
+  dibujarLeyenda(series);
+}
+
+function dibujarLeyenda(series){
+  const cont = document.getElementById("leyenda");
+  cont.textContent="";
+  series.forEach(s=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.setAttribute("aria-pressed", visibles.has(s.id) ? "true":"false");
+    const m=document.createElement("span");
+    m.className="muestra";
+    m.style.borderTopColor = s.col;
+    if(s.guion) m.style.borderTopStyle="dashed";
+    const t=document.createElement("span"); t.textContent=s.nom;
+    b.append(m,t);
+    b.addEventListener("click",()=>{
+      if(visibles.has(s.id)) visibles.delete(s.id); else visibles.add(s.id);
+      dibujarGrafica();
+    });
+    cont.appendChild(b);
+  });
+}
+
+function alternar(k){
+  const p = fuera.indexOf(k);
+  if(p>=0) fuera.splice(p,1); else fuera.push(k);
+  pintar();
+}
+
+// El caso base se calcula primero para poder mostrar los deltas
+base = resolver([]).V.slice();
+pintar();
+</script>
+</body>
+</html>
